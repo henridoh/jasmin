@@ -78,6 +78,12 @@ let parse_and_compile (type reg regx xreg rflag cond asm_op extra_op)
     if not wi2i then prog else Compile.do_wint_int (module Arch) prog
   in
 
+  (* TODO: Rename flag *)
+  let prog =
+    if not wi2i then prog else Compile.do_ec_while (module Arch) prog
+  in
+
+
   let prog =
     if pass <= Compiler.ParamsExpansion then prog
     else
