@@ -32,7 +32,6 @@ Definition ec_while_spec :=
        fn1 = fn2 /\ fs_rel eq fr1 fr2
   |}.
 
-
 Let Pi (i : instr) :=
    forall c', ec_while_i i = c'
               -> wequiv_rec p' p ev ev ec_while_spec eq c' [:: i] eq.
@@ -109,9 +108,24 @@ Proof.
   - move=> v dir lo hi c Hc ii i <-. eapply wequiv_for_eq.
     done. by apply wrequiv_eq. intro. by apply wrequiv_eq.
     by apply Hc.
-  - move=> a c e info c' Hc Hc' ii cf <-.
+  - move=> a cdo e info cwh Hcdo Hcwh ii cf <-.
+    move=> s1 s2 Hs.
+    setoid_rewrite isem_cmd_while_rotate.
+    move: s1 s2 Hs.
+    change (wequiv_rec p' p ev ev ec_while_spec eq
+      (ec_while_i (MkI ii (Cwhile a cdo e info cwh)))
+      (cdo ++ [:: MkI ii (Cwhile a [::] e info (cwh ++ cdo))])
+      eq).
+
     simpl.
-    admit.
+    eapply wequiv_cat. exact (Hcdo _ erefl).
+    apply wequiv_while.
+    + move=>s1 s2 b <- /= ->.
+      by eexists.
+    by apply wequiv_nil.
+    eapply wequiv_cat.
+    exact (Hcwh _ erefl).
+    exact (Hcdo _ erefl).
   - move=> xs f es ii i <- /=.
     eapply wequiv_call_wa with (Pf:=rpreF (eS:=ec_while_spec)) (Qf:= rpostF (eS:=ec_while_spec)).
     + by apply wrequiv_eq.
@@ -125,4 +139,4 @@ Proof.
     + move=>fs1 fs2 fr1 fr2 Hpre [_ []] Hscs Hmem Hval.
       rewrite /upd_estate Hscs Hmem Hval. by apply wrequiv_eq.
   - by rewrite -hcomp.
-Admitted.
+Qed.
