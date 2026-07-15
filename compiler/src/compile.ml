@@ -127,11 +127,9 @@ let do_ec_while
        and type cond = cond
        and type asm_op = asm_op
        and type extra_op = extra_op) prog =
-  let _cp = Conv.cuprog_of_prog prog in
-  let cp = assert false in (* TODO *)
-  let cp = catch_error cp in
-  let (gd, fds) = Conv.prog_of_cuprog cp in
-  (gd, fds)
+  let cp = Conv.cuprog_of_prog prog in
+  let cp = Ec_while.ec_while_uprog Arch.asmOp cp in
+  Conv.prog_of_cuprog cp
 
 (*--------------------------------------------------------------------- *)
 

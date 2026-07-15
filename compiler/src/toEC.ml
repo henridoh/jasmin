@@ -1892,6 +1892,9 @@ struct
           let c2 env = toec_cmd asmOp env c2 in
           ec_leaking_if env e c1 c2
       | Cwhile (_, c1, e, _, c2) ->
+          (* c1 should be empty after ec_while. *)
+          (* TODO: simplify `ec_leaking_while` accordingly *)
+          assert (List.is_empty c1);
           let c1 env = toec_cmd asmOp env c1 in
           let c2 env = toec_cmd asmOp env c2 in
           ec_leaking_while env c1 e c2
