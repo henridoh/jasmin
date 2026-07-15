@@ -14,12 +14,13 @@ Local Open Scope Z_scope.
 
 Set Printing Implicit.
 
-Check _uprog.
-
-
 Section WITH_PARAMS.
 
-Context `{asmop:asmOp} {pd: PointerData} {msfsz : MSFsize} {pT : progT}.
+Context `{asmop:asmOp} {pd: PointerData} {msfsz : MSFsize}.
+
+Section PROGT.
+
+Context {pT : progT}.
 
 Definition ec_while_c (ec_while_i : instr -> cmd) (c : cmd) : cmd :=
   flatten (map ec_while_i c).
@@ -48,6 +49,11 @@ Definition ec_while_fun (f : fundef) : fundef :=
 
 Definition ec_while_prog (p : prog) : prog :=
   map_prog ec_while_fun p.
+
+End PROGT.
+
+Definition ec_while_uprog (p : _uprog) : _uprog :=
+  ec_while_prog (p : @prog _ _ progUnit).
 
 End WITH_PARAMS.
 

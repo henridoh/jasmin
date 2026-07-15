@@ -49,7 +49,7 @@ Proof.
   rewrite /sem_pre /p' => - [ <- <- <- ].
   rewrite get_map_prog_name.
   case assert_allowed => //=.
-  by case: (get_fundef (p_funcs p) fn).
+  by case: get_fundef.
 Qed.
 
 Lemma ec_while_sem_post fr1 fr2 fs fsi fn:
@@ -59,16 +59,8 @@ Lemma ec_while_sem_post fr1 fr2 fs fsi fn:
 Proof.
   rewrite /sem_post /p' => - [ <- <- <- ] ->.
   rewrite get_map_prog_name.
-  case assert_allowed => //=.
-  by case: (get_fundef (p_funcs p) fn) => //= a.
-Qed.
-
-Lemma ec_while_i_nil i :
-  ~ ec_while_i i = [::].
-Proof.
-  case: i => [] ii [] //.
-  move=> ? l ? ? ? /=.
-  by case: (ec_while_c ec_while_i l).
+  case: assert_allowed => //=.
+  by case: get_fundef.
 Qed.
 
 Lemma ec_while_l fn : wiequiv_f p' p ev ev (rpreF (eS:= ec_while_spec)) fn fn (rpostF (eS:=ec_while_spec)).
@@ -76,67 +68,81 @@ Proof.
   apply wequiv_fun_ind_wa =>{} fn fn' fsi fs.
   move => [<- hrel] fdi.
   rewrite get_map_prog_name.
-  case (get_fundef (p_funcs p) fn) => [fd | //] [= hcomp].
+  case: get_fundef => [fd | //] [= hcomp].
   exists fd => // hsem.
-  split. by apply (ec_while_sem_pre hrel).
+  split; first by apply (ec_while_sem_pre hrel).
   move=> si hinit.
   exists si.
-  - move: hinit.
-    rewrite /p' /initialize_funcall /ec_while_fun /with_body /estate0 /f_params //=.
+  { move: hinit.
+    rewrite /initialize_funcall /estate0.
     case: hrel => <- <- <-.
     by subst.
-  - exists eq, eq. split; first done; first last.
-    * move=> fr1 fr2 [_ Hrel]. apply ec_while_sem_post. done. by case: hrel.
-    * move=> i1 i2 o1 <- //= H. subst. by exists o1.
+  }
+  exists eq, eq.
+  split; first done; first last.
+  { move=> fr1 fr2 [_ Hrel].
+    apply ec_while_sem_post.
+    - assumption.
+    - by case: hrel.
+  }
+  { move=> i1 i2 o1 <- //= H. subst. by exists o1. }
+
   clear -Pc Pi Pi_r hcomp hsem.
   apply (cmd_rect (Pr := Pi_r) (Pi := Pi) (Pc := Pc)).
-  - easy.
-  - rewrite /Pc /ec_while_c /= => c <-. by apply wequiv_nil.
-  - move=> i c Hi Hc ? /= <-.
+  { done. }
+  { rewrite /Pc /ec_while_c /= => c <-. by apply wequiv_nil. }
+  { move=> i c Hi Hc ? /= <-.
     rewrite -cat1s. eapply wequiv_cat. by apply Hi. by apply Hc.
-  - move=> x tg ty e ii i <-. apply wequiv_assgn_eq.
+  }
+  { move=> x tg ty e ii i <-. apply wequiv_assgn_eq.
     by apply wrequiv_eq. intro. by apply wrequiv_eq.
-  - move=> xs t o es ii i <-. apply wequiv_opn_eq.
+  }
+  { move=> xs t o es ii i <-. apply wequiv_opn_eq.
     by apply wrequiv_eq. intro. by apply wrequiv_eq.
-  - move=> xs o es ii i <-. apply wequiv_syscall_eq. by move=>??->.
+  }
+  { move=> xs o es ii i <-. apply wequiv_syscall_eq. by move=>??->.
     by apply wrequiv_eq. intro. by apply wrequiv_eq.
     intro. by apply wrequiv_eq.
-  - move=> a ii i <-. apply wequiv_assert_eq. split; first done.
+  }
+  { move=> a ii i <-. apply wequiv_assert_eq. split; first done.
     by apply wrequiv_eq. done.
-  - move=> e c1 c2 Hc1 Hc2 ii i <-. apply wequiv_if_eq.
+  }
+  { move=> e c1 c2 Hc1 Hc2 ii i <-. apply wequiv_if_eq.
     by apply wrequiv_eq. case. by apply Hc1. by apply Hc2.
-  - move=> v dir lo hi c Hc ii i <-. eapply wequiv_for_eq.
+  }
+  { move=> v dir lo hi c Hc ii i <-. eapply wequiv_for_eq.
     done. by apply wrequiv_eq. intro. by apply wrequiv_eq.
     by apply Hc.
-  - move=> a cdo e info cwh Hcdo Hcwh ii cf <-.
-    move=> s1 s2 Hs.
+  }
+  { move=> a cdo e info cwh Hcdo Hcwh ii cf <-.
+    rewrite /wequiv_rec /wequiv /wkequiv /wkequiv_io.
     setoid_rewrite isem_cmd_while_rotate.
-    move: s1 s2 Hs.
     change (wequiv_rec p' p ev ev ec_while_spec eq
-      (ec_while_i (MkI ii (Cwhile a cdo e info cwh)))
-      (cdo ++ [:: MkI ii (Cwhile a [::] e info (cwh ++ cdo))])
-      eq).
-
-    simpl.
-    eapply wequiv_cat. exact (Hcdo _ erefl).
-    apply wequiv_while.
-    + move=>s1 s2 b <- /= ->.
-      by eexists.
-    by apply wequiv_nil.
+              (ec_while_i (MkI ii (Cwhile a cdo e info cwh)))
+              (cdo ++ [:: MkI ii (Cwhile a [::] e info (cwh ++ cdo))])
+              eq).
     eapply wequiv_cat.
-    exact (Hcwh _ erefl).
-    exact (Hcdo _ erefl).
-  - move=> xs f es ii i <- /=.
-    eapply wequiv_call_wa with (Pf:=rpreF (eS:=ec_while_spec)) (Qf:= rpostF (eS:=ec_while_spec)).
-    + by apply wrequiv_eq.
-    + move=> s1 s2 vs1 vs2 <- <-.
-      by apply ec_while_sem_pre.
-    + move=> s1 s2 vs1 vs2 <- <-.
-      do? split; done.
-    + move=> fs1 fs2 fr1 fr2 [_ Hpre] [_ Hpost].
-      eapply ec_while_sem_post. done. by case: Hpre.
-    + move=>???. by apply wequiv_fun_rec.
-    + move=>fs1 fs2 fr1 fr2 Hpre [_ []] Hscs Hmem Hval.
+    - exact (Hcdo _ erefl).
+    - apply wequiv_while.
+      + by move=>s1 s2 b <- ->; eexists.
+      + by apply wequiv_nil.
+      + eapply wequiv_cat.
+        * exact (Hcwh _ erefl).
+        * exact (Hcdo _ erefl).
+  }
+  { move=> xs f es ii i <- /=.
+    eapply wequiv_call_wa
+      with (Pf:=rpreF (eS:=ec_while_spec)) (Qf:= rpostF (eS:=ec_while_spec)).
+    - by apply wrequiv_eq.
+    - move=> s1 s2 vs1 vs2 <- <-. by apply ec_while_sem_pre.
+    - by intros; subst.
+    - move=> fs1 fs2 fr1 fr2 [_ Hpre] [_ Hpost].
+      eapply ec_while_sem_post. assumption. by case: Hpre.
+    - move=>???. by apply wequiv_fun_rec.
+    - move=>fs1 fs2 fr1 fr2 Hpre [_ []] Hscs Hmem Hval.
       rewrite /upd_estate Hscs Hmem Hval. by apply wrequiv_eq.
-  - by rewrite -hcomp.
+  }
+  { by rewrite -hcomp. }
 Qed.
+
+End PROOF.
