@@ -191,15 +191,19 @@ Lemma wequiv_for_rename X ii dir lo hi c c' x x' :
   Sv.Subset (Sv.union (read_e lo) (Sv.union (read_e hi) (vars_c c))) X ->
   Sv.In (v_var x) X ->
   ~~ Sv.mem (v_var x') X ->
+  vtype x = vtype x' ->
   wequiv_rec p' p ev ev ec_for_spec (st_eq_on X) c' c (st_eq_on X) ->
   wequiv_rec p' p ev ev ec_for_spec (st_eq_on X)
     [:: MkI ii (Cfor x' (dir, lo, hi)
-                  (MkI ii (Cassgn (Lvar x) AT_inline (vtype x) (Plvar x')) :: c')) ]
+                  (MkI ii (Cassgn x AT_inline (vtype x) (Plvar x')) :: c')) ]
     [:: MkI ii (Cfor x (dir, lo, hi) c) ]
     (st_eq_on X).
 Proof.
-  move=> HX Hx Hx' Hc.
-  eapply wequiv_for. done.
+  move=> HX Hx Hx' Hty Hc.
+  apply wequiv_for
+    with (Pi := fun s t => st_eq_on (Sv.remove x X) s t
+                           /\ (evm s).[x'] = (evm t).[x]).
+  { done. }
   { rewrite eq_globs.
     apply wrequiv_sem_bound.
     apply (wrequiv_weaken (P := st_eq_on X) (Q := eq))
@@ -208,11 +212,59 @@ Proof.
     rewrite 2!read_es_cons.
     clear -HX; SvD.fsetdec.
   }
-  (* Afterwards, the two programs agree on (X \ { x }) and x'{&1} = x{&2}. *)
-  admit.
-  (* Now, programs agree on X again and loop body only reads/writes on X *)
-  admit.
-Admitted.
+  { move=> i s1 s2 s3 [] Hscs Hmem Hvm Hwrite.
+    exists (with_vm s2 (evm s2).[x <- i]).
+
+    rewrite write_varP; split; try done.
+    case: (write_getP_eq Hwrite). by rewrite Hty.
+
+    do 2? split; simpl.
+    - rewrite -Hscs. symmetry. exact (write_var_scsP Hwrite).
+    - rewrite -Hmem. symmetry. exact (write_var_memP Hwrite).
+    - move=> el Hel /=.
+      have Hvm' := vrvP_var Hwrite.
+      rewrite Vm.setP_neq
+      ; last by apply/negP => /eqP h; subst; clear -Hel; SvD.fsetdec.
+      rewrite -Hvm; last by clear -Hel; SvD.fsetdec.
+      rewrite Hvm' //.
+      apply: Sv_neq_not_in_singleton.
+      intro. subst. move/Sv_memP : Hx'.
+      clear -Hel. SvD.fsetdec.
+    - rewrite Vm.setP_eq.
+      have [Hdb Hatype ->] := write_getP_eq Hwrite.
+      by rewrite Hty.
+  }
+  { rewrite -[c]@cat0s -cat1s.
+    apply wequiv_cat with (R := st_eq_on X); last assumption.
+    apply wequiv_assign_left.
+    move=>s s' t [] [] Hscs Hmem Hvm Hvm_index.
+    apply rbindP => v Hexpr.
+    apply rbindP => v' Hval Hwrite.
+    split.
+    - rewrite -Hscs. symmetry. exact (lv_write_scsP Hwrite).
+    - rewrite -Hmem. symmetry. unshelve eapply (lv_write_memP _ Hwrite); first done.
+      move=> el Hel.
+      case h: (el == x).
+      + move/eqP: h => ?; subst el.
+        rewrite -Hvm_index.
+        apply: rbindP Hexpr=> -[] _ [= Hv]; subst v.
+
+        apply truncate_val_subctype_eq in Hval;
+          last by rewrite Hvm_index; apply getP_subctype.
+        subst v'.
+
+        apply: rbindP Hwrite => s'vm Hset [=].
+        apply: rbindP Hset=> -[] _.
+        apply: rbindP=> -[] _ [= <-] <- /=.
+        rewrite Vm.setP_eq Hty.
+        by apply vm_truncate_val_get.
+
+      + move/eqP: h => h.
+        rewrite -(vrvP Hwrite).
+        apply Hvm. clear -h Hel; SvD.fsetdec.
+        rewrite vrv_var. clear -h; SvD.fsetdec.
+  }
+Qed.
 
 Lemma subset_vars_c_cons i c V
   : Sv.Subset (vars_c (i :: c)) V
@@ -229,6 +281,7 @@ Proof.
     apply H.
     apply Sv.union_spec. by right.
 Qed.
+
 
 Lemma wrequiv_write_lval_write_lvals gs b x v V :
   wrequiv
@@ -344,7 +397,8 @@ Proof.
       ; try done; clear -HV; SvD.fsetdec.
   }
   (* Cfor *)
-  { move=> v dir lo hi c Hc ii X. rewrite vars_I_for => hsub i' /=.
+  { move=> v dir lo hi c Hc ii X.
+    rewrite vars_I_for => hsub i' /=.
     t_xrbindP => ir'.
     t_xrbindP => c' hc'.
     case: ifPn => hwr.
@@ -355,6 +409,8 @@ Proof.
       + apply Hc => //.
         by clear -hsub; SvD.fsetdec.
     - t_xrbindP => Hassert /= <- <-.
+      set v' := fresh_loop_counter fresh_var_ident v ii.
+      have Hvtype : vtype v = vtype v' by done.
       apply wequiv_for_rename => //.
       + by clear -hsub; SvD.fsetdec.
       + by clear -hsub; SvD.fsetdec.
@@ -400,40 +456,47 @@ Proof.
   move => [<- /fs_rel_eq <-] fd1.
   case Hfd': get_fundef => [fd | //] [= hcomp].
   case Hfd: (get_fundef (p_funcs p) fn); first last.
-  - exfalso.
+  { exfalso.
     move: (ec_for_get_fundef_none Hfd).
     by rewrite Hfd'.
-  - eexists; first reflexivity.
-    move: (ec_for_get_fundef Hfd) => [?].
-    rewrite Hfd' => [= Hsub] Hc. subst.
-    move=> hsempre.
-    split.
-    + apply: ec_for_sem_pre. rewrite fs_rel_eq. reflexivity. done.
-      move=> si hinit.
-      exists si.
+  }
+  eexists; first reflexivity.
+  move: (ec_for_get_fundef Hfd) => [?].
+  rewrite Hfd' => [= Hsub] Hc. subst.
+  move=> hsempre.
+  split. { apply: ec_for_sem_pre. rewrite fs_rel_eq. reflexivity. done. }
+
+  move=> si hinit.
+  exists si.
   { move: hinit.
     move: (ec_for_fun_inv Hc). case; do 7 intro.
     apply eq_initialize; try done.
     move: Hp. rewrite /ec_for_prog.
     t_xrbindP=>??. by elim.
   }
-  eexists _, _. split.
+  eexists _, _; split.
   2: {
     apply ec_for_body; first last.
     - move: Hc.
       rewrite /ec_for_fun.
       t_xrbindP => ? ? ?.
       subst. simpl. eassumption.
-    - admit.
+    - rewrite /vars_fd. clear; SvD.fsetdec.
   }
   { done. }
-  { admit. }
-  { move=> fr1 fr2 [_ Hrel].
-    apply ec_for_sem_post.
-    - assumption.
-    - done.
+  { eapply wrequiv_weaken; first last.
+    - apply st_eq_on_finalize;
+        by case: (ec_for_fun_inv Hc).
+    - by move=> ?? ->.
+    - move=> ?? [] H1 H2 H3.
+      split; try done.
+      eapply eq_onI; last exact H3.
+      clear -Hc. case: (ec_for_fun_inv Hc). do? elim.
+      rewrite /vars_fd. SvD.fsetdec.
   }
-Admitted.
+  { move=> fs1 fs2 [] _ ?.
+    by apply ec_for_sem_post.
+  }
+Qed.
 
 End PROOF.
-
