@@ -83,5 +83,5 @@ Separate Extraction
   riscv_params
   compiler
   wint_int
-  ec_while
-  ec_for.
+  toec_while
+  toec_for.

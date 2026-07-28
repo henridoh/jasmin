@@ -14,7 +14,9 @@ Local Open Scope Z_scope.
 
 Set Printing Implicit.
 
-Section WITH_PARAMS.
+(* Convert Jasmin's complex while loops into simple ones. *)
+
+Section TOEC_WHILE.
 
 Context `{asmop:asmOp} {pd: PointerData} {msfsz : MSFsize}.
 
@@ -22,38 +24,38 @@ Section PROGT.
 
 Context {pT : progT}.
 
-Definition ec_while_c (ec_while_i : instr -> cmd) (c : cmd) : cmd :=
+Definition toec_while_c (ec_while_i : instr -> cmd) (c : cmd) : cmd :=
   flatten (map ec_while_i c).
 
-Fixpoint ec_while_i (i : instr) : cmd :=
+Fixpoint toec_while_i (i : instr) : cmd :=
   let 'MkI ii ir := i in
   match ir with
   | Cassgn _ _ _ _ | Copn _ _ _ _ | Csyscall _ _ _
   | Cassert _      | Ccall _ _ _ => [:: i]
   | Cif e c1 c2 =>
-      let c1 := ec_while_c ec_while_i c1 in
-      let c2 := ec_while_c ec_while_i c2 in
+      let c1 := toec_while_c toec_while_i c1 in
+      let c2 := toec_while_c toec_while_i c2 in
       [:: MkI ii (Cif e c1 c2)]
   | Cfor x r c =>
-      let c := ec_while_c ec_while_i c in
+      let c := toec_while_c toec_while_i c in
       [:: MkI ii (Cfor x r c)]
   | Cwhile a c1 e ii c2 =>
-      let c1 := ec_while_c ec_while_i c1 in
-      let c2 := ec_while_c ec_while_i c2 in
+      let c1 := toec_while_c toec_while_i c1 in
+      let c2 := toec_while_c toec_while_i c2 in
       let tl := Cwhile a [::] e ii (c2 ++ c1) in
       c1 ++ [:: MkI ii tl]
   end.
 
-Definition ec_while_fun (f : fundef) : fundef :=
-  with_body f (ec_while_c ec_while_i (f_body f)).
+Definition toec_while_fun (f : fundef) : fundef :=
+  with_body f (toec_while_c toec_while_i (f_body f)).
 
-Definition ec_while_prog (p : prog) : prog :=
-  map_prog ec_while_fun p.
+Definition toec_while_prog (p : prog) : prog :=
+  map_prog toec_while_fun p.
 
 End PROGT.
 
-Definition ec_while_uprog (p : _uprog) : _uprog :=
-  ec_while_prog (p : @prog _ _ progUnit).
+Definition toec_while_uprog (p : _uprog) : _uprog :=
+  toec_while_prog (p : @prog _ _ progUnit).
 
-End WITH_PARAMS.
+End TOEC_WHILE.
 

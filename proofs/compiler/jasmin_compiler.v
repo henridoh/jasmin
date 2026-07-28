@@ -6,5 +6,5 @@ Require x86_params.
 Require riscv_params.
 Require sem_params_of_arch_extra.
 Require wint_int.
-Require ec_while.
-Require ec_for.
+Require toec_while.
+Require toec_for.

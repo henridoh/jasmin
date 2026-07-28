@@ -1380,6 +1380,9 @@ let rec remove_for_i i =
     | Cwhile(a, c1, e, loc, c2) -> Cwhile(a, remove_for c1, e, loc, remove_for c2)
     | Cfor(j,r,c) ->
       let jd = j.pl_desc in
+      assert (not (is_write_c jd c));
+      Cfor(j, r, remove_for c)
+      (*
       if not (is_write_c jd c) then Cfor(j, r, remove_for c)
       else
         let jd' = V.clone jd in
@@ -1387,6 +1390,7 @@ let rec remove_for_i i =
         let ii' = Cassgn (Lvar j, E.AT_inline, jd.v_ty, Pvar (gkvar j')) in
         let ii' = { i with i_desc = ii' } in
         Cfor (j', r, ii' :: remove_for c)
+      *)
   in
   { i with i_desc }
 and remove_for c = List.map remove_for_i c
