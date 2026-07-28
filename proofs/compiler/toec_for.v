@@ -14,7 +14,7 @@ Local Open Scope Z_scope.
 
 Set Printing Implicit.
 
-(* Converts for loops into equavalent ones where the index variable is not modified in the body. *)
+(* Converts for loops into equivalent ones where the index variable is not modified in the body. *)
 
 Section TOEC_FOR.
 
