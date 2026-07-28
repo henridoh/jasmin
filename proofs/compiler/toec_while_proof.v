@@ -1,6 +1,6 @@
 From mathcomp Require Import ssreflect ssrfun ssrbool eqtype ssralg word_ssrZ.
 Require Import compiler_util pseudo_operator psem psem_facts.
-Require Import ec_while.
+Require Import toec_while.
 Import Utf8.
 
 Section PROOF.
@@ -21,7 +21,7 @@ Context
 Context {E E0: Type -> Type} {wE : with_Error E E0} {rE : EventRels E0}.
 
 Context (p : prog) (ev:extra_val_t).
-Definition p' := ec_while_prog p.
+Definition p' := toec_while_prog p.
 
 (* ------------------------------------------------- *)
 
@@ -33,13 +33,13 @@ Definition ec_while_spec :=
   |}.
 
 Let Pi (i : instr) :=
-   forall c', ec_while_i i = c'
+   forall c', toec_while_i i = c'
               -> wequiv_rec p' p ev ev ec_while_spec eq c' [:: i] eq.
 
 Let Pi_r (i:instr_r) := forall ii, Pi (MkI ii i).
 
 Let Pc  (c:cmd) :=
-   forall c', ec_while_c ec_while_i c = c'
+   forall c', toec_while_c toec_while_i c = c'
               -> wequiv_rec p' p ev ev ec_while_spec eq c' c eq.
 
 Lemma ec_while_sem_pre fn fsi fs :
@@ -90,7 +90,7 @@ Proof.
   clear -Pc Pi Pi_r hcomp hsem.
   apply (cmd_rect (Pr := Pi_r) (Pi := Pi) (Pc := Pc)).
   { done. }
-  { rewrite /Pc /ec_while_c /= => c <-. by apply wequiv_nil. }
+  { rewrite /Pc /toec_while_c /= => c <-. by apply wequiv_nil. }
   { move=> i c Hi Hc ? /= <-.
     rewrite -cat1s. eapply wequiv_cat. by apply Hi. by apply Hc.
   }
@@ -118,7 +118,7 @@ Proof.
     rewrite /wequiv_rec /wequiv /wkequiv /wkequiv_io.
     setoid_rewrite isem_cmd_while_rotate.
     change (wequiv_rec p' p ev ev ec_while_spec eq
-              (ec_while_i (MkI ii (Cwhile a cdo e info cwh)))
+              (toec_while_i (MkI ii (Cwhile a cdo e info cwh)))
               (cdo ++ [:: MkI ii (Cwhile a [::] e info (cwh ++ cdo))])
               eq).
     eapply wequiv_cat.

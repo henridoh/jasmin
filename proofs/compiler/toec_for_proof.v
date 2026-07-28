@@ -1,6 +1,6 @@
 From mathcomp Require Import ssreflect ssrfun ssrbool eqtype ssralg word_ssrZ.
 Require Import compiler_util pseudo_operator psem psem_facts.
-Require Import ec_for.
+Require Import toec_for.
 
 
 
@@ -61,12 +61,12 @@ Context {E E0: Type -> Type} {wE : with_Error E E0} {rE : EventRels E0}.
 Context (fresh_var_ident : v_kind -> instr_info -> string -> atype -> Ident.ident).
 
 Context (p p' : prog) (ev : extra_val_t).
-Hypothesis Hp : ec_for_prog fresh_var_ident p = ok p'.
+Hypothesis Hp : toec_for_prog fresh_var_ident p = ok p'.
 
 Lemma eq_globs : p_globs p' = p_globs p.
 Proof. by apply: rbindP Hp => ?? [= <-]. Qed.
 
-Definition ec_for_spec :=
+Definition toec_for_spec :=
   {| rpreF_ := fun fn1 fn2 fs1 fs2 =>
        fn1 = fn2 /\ fs_rel eq fs1 fs2
    ; rpostF_ := fun fn1 fn2 fs1 fs2 fr1 fr2 =>
@@ -80,8 +80,8 @@ Proof.
   - by elim.
 Qed.
 
-Lemma ec_for_fun_inv f f'
-  : ec_for_fun fresh_var_ident f = ok f'
+Lemma toec_for_fun_inv f f'
+  : toec_for_fun fresh_var_ident f = ok f'
     -> [/\ f_info f = f_info f'
       , f_contract f = f_contract f'
       , f_tyin f = f_tyin f'
@@ -89,16 +89,16 @@ Lemma ec_for_fun_inv f f'
       , f_tyout f = f_tyout f'
       , f_res f = f_res f'
       & f_extra f = f_extra f' ].
-Proof. rewrite /ec_for_fun. t_xrbindP=>??. by elim. Qed.
+Proof. rewrite /toec_for_fun. t_xrbindP=>??. by elim. Qed.
 
-Lemma ec_for_get_fundef fn fd :
+Lemma toec_for_get_fundef fn fd :
   get_fundef (p_funcs p) fn = Some fd ->
   exists2 fd',
     get_fundef (p_funcs p') fn = Some fd'
-    & ec_for_fun fresh_var_ident fd = ok fd'.
+    & toec_for_fun fresh_var_ident fd = ok fd'.
 Proof.
   move: Hp.
-  rewrite /ec_for_prog.
+  rewrite /toec_for_prog.
   t_xrbindP => p'_funcs Hp'_funcs <- /=.
   move: p'_funcs Hp'_funcs.
 
@@ -111,7 +111,7 @@ Proof.
   move=>??; subst.
   move: Hp'fdef.
   rewrite /add_finfo /add_funname /=.
-  case Hp'_fundef: ec_for_fun; last done.
+  case Hp'_fundef: toec_for_fun; last done.
   move=> [=] ?. subst.
   case Hfn: (fn == p_fun_name).
   - move=>[] <-. by eexists. 
@@ -119,12 +119,12 @@ Proof.
 Qed.
 
 (* TODO: repitition *)
-Lemma ec_for_get_fundef_none fn :
+Lemma toec_for_get_fundef_none fn :
   get_fundef (p_funcs p) fn = None
   -> get_fundef (p_funcs p') fn = None.
 Proof.
   move: Hp.
-  rewrite /ec_for_prog.
+  rewrite /toec_for_prog.
   t_xrbindP => p'_funcs Hp'_funcs <- /=.
   move: p'_funcs Hp'_funcs.
 
@@ -137,12 +137,12 @@ Proof.
   move=>??; subst.
   move: Hp'fdef.
   rewrite /add_finfo /add_funname /=.
-  case Hp'_fundef: ec_for_fun; last done.
+  case Hp'_fundef: toec_for_fun; last done.
   move=> [=] ?. subst.
   case Hfn: (fn == p_fun_name). done. by apply IH.
 Qed.
 
-Lemma ec_for_sem_pre fn fsi fs :
+Lemma toec_for_sem_pre fn fsi fs :
   fs_rel eq fsi fs ->
   sem_pre p' fn fsi = ok tt ->
   sem_pre p fn fs = ok tt.
@@ -150,13 +150,13 @@ Proof.
   rewrite fs_rel_eq. elim => <-.
   rewrite /sem_pre /=.
   case H: (get_fundef (p_funcs p) fn).
-  - move: (ec_for_get_fundef H) => [? -> H'].
-    move: (ec_for_fun_inv H') => []; do 7 elim.
+  - move: (toec_for_get_fundef H) => [? -> H'].
+    move: (toec_for_fun_inv H') => []; do 7 elim.
     rewrite eq_globs. done.
-  - by move: (ec_for_get_fundef_none H) ->.
+  - by move: (toec_for_get_fundef_none H) ->.
 Qed.
 
-Lemma ec_for_sem_post fr1 fr2 fs fsi fn :
+Lemma toec_for_sem_post fr1 fr2 fs fsi fn :
   fs_rel eq fr1 fr2 ->
   fvals fsi = fvals fs ->
   sem_post p' fn (fvals fsi) fr1 = ok tt ->
@@ -165,10 +165,10 @@ Proof.
   rewrite fs_rel_eq. elim => <-.
   rewrite /sem_post /=.
   case H: (get_fundef (p_funcs p) fn).
-  - move: (ec_for_get_fundef H) => [? -> H'].
-    move: (ec_for_fun_inv H') => []; do 7 elim.
+  - move: (toec_for_get_fundef H) => [? -> H'].
+    move: (toec_for_fun_inv H') => []; do 7 elim.
     rewrite eq_globs. done.
-  - by move: (ec_for_get_fundef_none H) ->.
+  - by move: (toec_for_get_fundef_none H) ->.
 Qed.
 
 #[local] Lemma checker_st_eq_onP' : Checker_eq p' p checker_st_eq_on.
@@ -177,23 +177,23 @@ Proof. by apply checker_st_eq_onP; rewrite eq_globs. Qed.
 
 Let Pi (i : instr) :=
   forall X, Sv.Subset (vars_I i) X ->
-  forall i', ec_for_i fresh_var_ident X i = ok i' ->
-  wequiv_rec p' p ev ev ec_for_spec (st_eq_on X) [:: i'] [:: i] (st_eq_on X).
+  forall i', toec_for_i fresh_var_ident X i = ok i' ->
+  wequiv_rec p' p ev ev toec_for_spec (st_eq_on X) [:: i'] [:: i] (st_eq_on X).
 
 Let Pi_r (ir : instr_r) := forall ii, Pi (MkI ii ir).
 
 Let Pc (c : cmd) :=
   forall X, Sv.Subset (vars_c c) X ->
-  forall c', ec_for_c fresh_var_ident X c = ok c' ->
-  wequiv_rec p' p ev ev ec_for_spec (st_eq_on X) c' c (st_eq_on X).
+  forall c', toec_for_c fresh_var_ident X c = ok c' ->
+  wequiv_rec p' p ev ev toec_for_spec (st_eq_on X) c' c (st_eq_on X).
 
 Lemma wequiv_for_rename X ii dir lo hi c c' x x' :
   Sv.Subset (Sv.union (read_e lo) (Sv.union (read_e hi) (vars_c c))) X ->
   Sv.In (v_var x) X ->
   ~~ Sv.mem (v_var x') X ->
   vtype x = vtype x' ->
-  wequiv_rec p' p ev ev ec_for_spec (st_eq_on X) c' c (st_eq_on X) ->
-  wequiv_rec p' p ev ev ec_for_spec (st_eq_on X)
+  wequiv_rec p' p ev ev toec_for_spec (st_eq_on X) c' c (st_eq_on X) ->
+  wequiv_rec p' p ev ev toec_for_spec (st_eq_on X)
     [:: MkI ii (Cfor x' (dir, lo, hi)
                   (MkI ii (Cassgn x AT_inline (vtype x) (Plvar x')) :: c')) ]
     [:: MkI ii (Cfor x (dir, lo, hi) c) ]
@@ -327,11 +327,11 @@ Proof.
   by apply write_lvals_st_eq_on.
 Qed.
 
-Lemma ec_for_body : forall c, Pc c.
+Lemma toec_for_body : forall c, Pc c.
 Proof.
   apply (cmd_rect (Pr := Pi_r) (Pi := Pi)).
   { done. }
-  { rewrite /Pc /ec_for_c /= => V HV c [<-]. by apply wequiv_nil. }
+  { rewrite /Pc /toec_for_c /= => V HV c [<-]. by apply wequiv_nil. }
   { move=> i c Hi Hc V HV c'.
     apply rbindP => y Hy.
     apply rbindP => ys Hys [= <-].
@@ -431,15 +431,15 @@ Proof.
   { move=> xs f es ii V HV i' [= <-] /=.
     rewrite vars_I_call in HV.
     eapply wequiv_call_wa
-      with (Pf:=rpreF (eS:=ec_for_spec))
-           (Qf:= rpostF (eS:=ec_for_spec))
+      with (Pf:=rpreF (eS:=toec_for_spec))
+           (Qf:= rpostF (eS:=toec_for_spec))
            (Rv := eq).
     - rewrite eq_globs; apply st_eq_on_pexprs; clear -HV; SvD.fsetdec.
     - move=> s1 s2 v1 v2 [] H1 H2 H3 <- Hsem.
-      by eapply (ec_for_sem_pre); last eassumption.
+      by eapply (toec_for_sem_pre); last eassumption.
     - by move=>???? [].
     - move=> fs1 fs2 fr1 fr2 [_ Hpre] [_ Hpost].
-      eapply ec_for_sem_post. assumption. by case: Hpre.
+      eapply toec_for_sem_post. assumption. by case: Hpre.
     - move=>???. by apply wequiv_fun_rec.
     - move=>fs1 fs2 fr1 fr2 Hpre [_ []] Hscs Hmem Hval.
       have -> : fr1 = fr2. { destruct fr1, fr2. simpl in Hscs, Hmem, Hval. by subst. }
@@ -449,36 +449,36 @@ Proof.
   }
 Qed.
 
-Lemma ec_for_l fn :
-  wiequiv_f p' p ev ev (rpreF (eS:= ec_for_spec)) fn fn (rpostF (eS:=ec_for_spec)).
+Lemma toec_for_l fn :
+  wiequiv_f p' p ev ev (rpreF (eS:= toec_for_spec)) fn fn (rpostF (eS:=toec_for_spec)).
 Proof.
   apply wequiv_fun_ind_wa =>{} fn fn' fsi fs.
   move => [<- /fs_rel_eq <-] fd1.
   case Hfd': get_fundef => [fd | //] [= hcomp].
   case Hfd: (get_fundef (p_funcs p) fn); first last.
   { exfalso.
-    move: (ec_for_get_fundef_none Hfd).
+    move: (toec_for_get_fundef_none Hfd).
     by rewrite Hfd'.
   }
   eexists; first reflexivity.
-  move: (ec_for_get_fundef Hfd) => [?].
+  move: (toec_for_get_fundef Hfd) => [?].
   rewrite Hfd' => [= Hsub] Hc. subst.
   move=> hsempre.
-  split. { apply: ec_for_sem_pre. rewrite fs_rel_eq. reflexivity. done. }
+  split. { apply: toec_for_sem_pre. rewrite fs_rel_eq. reflexivity. done. }
 
   move=> si hinit.
   exists si.
   { move: hinit.
-    move: (ec_for_fun_inv Hc). case; do 7 intro.
+    move: (toec_for_fun_inv Hc). case; do 7 intro.
     apply eq_initialize; try done.
-    move: Hp. rewrite /ec_for_prog.
+    move: Hp. rewrite /toec_for_prog.
     t_xrbindP=>??. by elim.
   }
   eexists _, _; split.
   2: {
-    apply ec_for_body; first last.
+    apply toec_for_body; first last.
     - move: Hc.
-      rewrite /ec_for_fun.
+      rewrite /toec_for_fun.
       t_xrbindP => ? ? ?.
       subst. simpl. eassumption.
     - rewrite /vars_fd. clear; SvD.fsetdec.
@@ -486,16 +486,16 @@ Proof.
   { done. }
   { eapply wrequiv_weaken; first last.
     - apply st_eq_on_finalize;
-        by case: (ec_for_fun_inv Hc).
+        by case: (toec_for_fun_inv Hc).
     - by move=> ?? ->.
     - move=> ?? [] H1 H2 H3.
       split; try done.
       eapply eq_onI; last exact H3.
-      clear -Hc. case: (ec_for_fun_inv Hc). do? elim.
+      clear -Hc. case: (toec_for_fun_inv Hc). do? elim.
       rewrite /vars_fd. SvD.fsetdec.
   }
   { move=> fs1 fs2 [] _ ?.
-    by apply ec_for_sem_post.
+    by apply toec_for_sem_post.
   }
 Qed.
 

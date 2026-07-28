@@ -80,7 +80,10 @@ let parse_and_compile (type reg regx xreg rflag cond asm_op extra_op)
 
   (* TODO: Rename flag *)
   let prog =
-    if not wi2i then prog else Compile.do_ec_while (module Arch) prog
+    if not wi2i then prog else 
+      let prog = Compile.do_toec_while (module Arch) prog in
+      let prog = Compile.do_toec_for (module Arch) prog in
+      prog
   in
 
 

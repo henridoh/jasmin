@@ -14,9 +14,11 @@ Local Open Scope Z_scope.
 
 Set Printing Implicit.
 
-Section WITH_PARAMS.
+(* Converts for loops into equavalent ones where the index variable is not modified in the body. *)
 
-Context `{asmop:asmOp} {pd: PointerData} {msfsz : MSFsize} {pT : progT}.
+Section TOEC_FOR.
+
+Context `{asmop:asmOp} {pd: PointerData} {msfsz : MSFsize}.
 
 Context (fresh_var_ident: v_kind -> instr_info -> string -> atype -> Ident.ident).
 
@@ -24,8 +26,8 @@ Definition fresh_loop_counter (x : var) ii : var_i :=
   let name := fresh_var_ident (Ident.id_kind x.(vname)) ii "index" (vtype x) in
   {| v_var := Var (vtype x) name ; v_info := var_info_of_ii ii |}.
 
-Fixpoint ec_for_i (V : Sv.t) (i : instr) : cexec instr :=
-  let ec_for_c := mapM (ec_for_i V) in
+Fixpoint toec_for_i (V : Sv.t) (i : instr) : cexec instr :=
+  let ec_for_c := mapM (toec_for_i V) in
   let 'MkI ii ir := i in
   Let ir' :=
     match ir with
@@ -52,16 +54,25 @@ Fixpoint ec_for_i (V : Sv.t) (i : instr) : cexec instr :=
     end
   in ok (MkI ii ir').
 
-Definition ec_for_c (V : Sv.t) : cmd -> cexec cmd :=
-  mapM (ec_for_i V).
+Definition toec_for_c (V : Sv.t) : cmd -> cexec cmd :=
+  mapM (toec_for_i V).
 
-Definition ec_for_fun (f : fundef) : cexec fundef :=
-  Let b := ec_for_c (vars_fd f) (f_body f) in
+Section PROGT.
+Context {pT : progT}.
+
+Definition toec_for_fun (f : fundef) : cexec fundef :=
+  Let b := toec_for_c (vars_fd f) (f_body f) in
   ok (with_body f b).
 
-Definition ec_for_prog (p : prog) : cexec prog :=
-  Let fds := map_cfprog ec_for_fun (p_funcs p) in
+Definition toec_for_prog (p : prog) : cexec prog :=
+  Let fds := map_cfprog toec_for_fun (p_funcs p) in
   ok {| p_funcs := fds; p_globs := p_globs p; p_extra := p_extra p |}.
 
-End WITH_PARAMS.
+End PROGT.
+
+
+Definition toec_for_uprog (p : _uprog) : cexec _uprog :=
+  toec_for_prog (p : @prog _ _ progUnit).
+
+End TOEC_FOR.
 
