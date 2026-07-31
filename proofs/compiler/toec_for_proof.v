@@ -1,8 +1,6 @@
-From mathcomp Require Import ssreflect ssrfun ssrbool eqtype ssralg word_ssrZ.
-Require Import compiler_util pseudo_operator psem psem_facts.
+From mathcomp Require Import ssreflect ssrfun ssrbool eqtype.
+Require Import compiler_util psem psem_facts.
 Require Import toec_for.
-
-
 
 Section PROOF.
 
@@ -14,7 +12,6 @@ Context
   {spp : SemPexprParams}
   {sip : SemInstrParams asm_op syscall_state}.
 
-#[local] Existing Instance sCP_unit.
 #[local] Existing Instance nosubword.
 #[local] Existing Instance indirect_c.
 #[local] Existing Instance withassert.
@@ -32,7 +29,7 @@ Lemma st_eq_on_pexprs gs:
   forall wdb V es,
     Sv.Subset (read_es es) V ->
     wrequiv (st_eq_on V) ((sem_pexprs wdb gs)^~ es) ((sem_pexprs wdb gs)^~ es) eq.
-Proof.
+Proof using sip.
   move=> ? V e HV s t v [] H1 H2 H3 H.
   exists v; last done.
   rewrite -H (escs_emem_with_vm H1 H2).
@@ -46,14 +43,12 @@ Lemma st_eq_on_pexpr gs:
   forall wdb V e,
     Sv.Subset (read_e e) V ->
     wrequiv (st_eq_on V) ((sem_pexpr wdb gs)^~ e) ((sem_pexpr wdb gs)^~ e) eq.
-Proof.
-  move=> ? V e HV s t v [] H1 H2 H3 H.
-  exists v; last done.
-  rewrite -H (escs_emem_with_vm H1 H2).
-  symmetry.
-  apply read_e_eq_on_empty.
-  rewrite read_eE => el Hel.
-  apply H3, HV. SvD.fsetdec.
+Proof using sip.
+  move=> wdb V e H s t v Heq Hsem.
+  change (read_e e) with (read_es [:: e]) in H.
+  have Hsems : sem_pexprs wdb gs s [:: e] = ok [:: v] by rewrite /= Hsem.
+  case: (st_eq_on_pexprs H Heq Hsems) => vs.
+  apply: rbindP => z Hsem' /= [= <-] [= ->]. by exists z.
 Qed.
 
 Context {E E0: Type -> Type} {wE : with_Error E E0} {rE : EventRels E0}.
@@ -64,7 +59,7 @@ Context (p p' : prog) (ev : extra_val_t).
 Hypothesis Hp : toec_for_prog fresh_var_ident p = ok p'.
 
 Lemma eq_globs : p_globs p' = p_globs p.
-Proof. by apply: rbindP Hp => ?? [= <-]. Qed.
+Proof using sip fresh_var_ident Hp. by apply: rbindP Hp => ?? [= <-]. Qed.
 
 Definition toec_for_spec :=
   {| rpreF_ := fun fn1 fn2 fs1 fs2 =>
@@ -96,7 +91,7 @@ Lemma toec_for_get_fundef fn fd :
   exists2 fd',
     get_fundef (p_funcs p') fn = Some fd'
     & toec_for_fun fresh_var_ident fd = ok fd'.
-Proof.
+Proof using Hp.
   move: Hp.
   rewrite /toec_for_prog.
   t_xrbindP => p'_funcs Hp'_funcs <- /=.
@@ -122,7 +117,7 @@ Qed.
 Lemma toec_for_get_fundef_none fn :
   get_fundef (p_funcs p) fn = None
   -> get_fundef (p_funcs p') fn = None.
-Proof.
+Proof using Hp.
   move: Hp.
   rewrite /toec_for_prog.
   t_xrbindP => p'_funcs Hp'_funcs <- /=.
@@ -146,7 +141,7 @@ Lemma toec_for_sem_pre fn fsi fs :
   fs_rel eq fsi fs ->
   sem_pre p' fn fsi = ok tt ->
   sem_pre p fn fs = ok tt.
-Proof.
+Proof using Hp.
   rewrite fs_rel_eq. elim => <-.
   rewrite /sem_pre /=.
   case H: (get_fundef (p_funcs p) fn).
@@ -161,7 +156,7 @@ Lemma toec_for_sem_post fr1 fr2 fs fsi fn :
   fvals fsi = fvals fs ->
   sem_post p' fn (fvals fsi) fr1 = ok tt ->
   sem_post p fn (fvals fs) fr2 = ok tt.
-Proof.
+Proof using Hp.
   rewrite fs_rel_eq. elim => <-.
   rewrite /sem_post /=.
   case H: (get_fundef (p_funcs p) fn).
@@ -172,7 +167,7 @@ Proof.
 Qed.
 
 #[local] Lemma checker_st_eq_onP' : Checker_eq p' p checker_st_eq_on.
-Proof. by apply checker_st_eq_onP; rewrite eq_globs. Qed.
+Proof using Hp. by apply checker_st_eq_onP; rewrite eq_globs. Qed.
 #[local] Hint Resolve checker_st_eq_onP' : core.
 
 Let Pi (i : instr) :=
@@ -198,7 +193,7 @@ Lemma wequiv_for_rename X ii dir lo hi c c' x x' :
                   (MkI ii (Cassgn x AT_inline (vtype x) (Plvar x')) :: c')) ]
     [:: MkI ii (Cfor x (dir, lo, hi) c) ]
     (st_eq_on X).
-Proof.
+Proof using Hp.
   move=> HX Hx Hx' Hty Hc.
   apply wequiv_for
     with (Pi := fun s t => st_eq_on (Sv.remove x X) s t
@@ -328,7 +323,7 @@ Proof.
 Qed.
 
 Lemma toec_for_body : forall c, Pc c.
-Proof.
+Proof using Hp.
   apply (cmd_rect (Pr := Pi_r) (Pi := Pi)).
   { done. }
   { rewrite /Pc /toec_for_c /= => V HV c [<-]. by apply wequiv_nil. }
@@ -451,7 +446,7 @@ Qed.
 
 Lemma toec_for_l fn :
   wiequiv_f p' p ev ev (rpreF (eS:= toec_for_spec)) fn fn (rpostF (eS:=toec_for_spec)).
-Proof.
+Proof using Hp.
   apply wequiv_fun_ind_wa =>{} fn fn' fsi fs.
   move => [<- /fs_rel_eq <-] fd1.
   case Hfd': get_fundef => [fd | //] [= hcomp].
