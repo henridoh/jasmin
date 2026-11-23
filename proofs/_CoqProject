@@ -245,6 +245,8 @@ toEC/for_to_while.v
 toEC/for_to_while_proof.v
 toEC/toec_for.v
 toEC/toec_for_proof.v
+toEC/toec_norm_cond.v
+toEC/toec_norm_cond_proof.v
 toEC/toec_prog.v
 toEC/toec_proof.v
 toEC/toec_while.v
